@@ -66,16 +66,22 @@ app.layout = html.Div([
     html.Center(html.B(html.H1('CS-340 Dashboard'))),
     html.Hr(),
     html.Div(
-
-        # FIXME Add in code for the interactive filtering options. For example, Radio buttons, drop down, checkboxes, etc.
+        dcc.Dropdown(
+            options=[
+                {'label': 'Water Rescue', 'value': '1'},
+                {'label': 'Mountain or Wilderness Rescue', 'value': '2'},
+                {'label': 'Disaster Rescue or Individual Tracking', 'value': '3'},
+                {'label': 'Reset', 'value': '4'}
+            ],
+            id='filter_type',
+            style={"width": "375px"}
+        )
 
     ),
     html.Hr(),
     dash_table.DataTable(id='datatable-id',
                          columns=[{"name": i, "id": i, "deletable": False, "selectable": True} for i in df.columns],
                          data=df.to_dict('records'),
-                         # FIXME: Set up the features for your interactive data table to make it user-friendly for your client
-                         # If you completed the Module Six Assignment, you can copy in the code you created here
                          row_selectable="single",
                          selected_rows=[]
                          ),
@@ -101,19 +107,59 @@ app.layout = html.Div([
 #############################################
 # Interaction Between Components / Controller
 #############################################
+# Dropdown filter
 
-
-@app.callback(Output('datatable-id', 'data'),
-              [Input('filter-type', 'value')])
+@app.callback([Output('datatable-id', 'data'),
+               Output('datatable-id', 'columns')],
+              [Input('filter_type', 'value')])
 def update_dashboard(filter_type):
-    # FIX ME Add code to filter interactive data table with MongoDB queries
-    #
-    #
+    if filter_type == '1':
+        df = pd.DataFrame.from_records(db.Read({'$and': [{'sex_upon_outcome': 'Intact Female'},
+                               {'$or': [
+                                   {'breed': {"$regex": "Newfoundland"}},
+                                   {'breed': {"$regex": "Chesa"}},
+                                   {'breed': {"$regex": "Labrador Retriever"}}]
+                               },
+                               {
+                                   '$and': [{'age_upon_outcome_in_weeks': {'$gte': 26, '$lte': 156}}]
+                               }]
+                      }))
+    if filter_type == '2':
+        df = pd.DataFrame.from_records(db.Read({'$and': [{'sex_upon_outcome': 'Intact Male'},
+                         {'$or': [
+                             {'breed': {"$regex": "German Shepherd"}},
+                             {'breed': {"$regex": "Alaskan Malamute"}},
+                             {'breed': {"$regex": "Old English Sheepdog"}},
+                             {'breed': {"$regex": "Siberian Husky"}},
+                             {'breed': {"$regex": "Rottweiler"}},
+                         ]
+                         },
+                         {
+                             '$and': [{'age_upon_outcome_in_weeks': {'$gte': 26, '$lte': 156}}]
+                         }]
+                }))
+    if filter_type == '3':
+        df = pd.DataFrame.from_records(db.Read({'$and': [{'sex_upon_outcome': 'Intact Male'},
+                         {'$or': [
+                             {'breed': {"$regex": "Doberman Pinscher"}},
+                             {'breed': {"$regex": "German Shepherd"}},
+                             {'breed': {"$regex": "Golden Retriever"}},
+                             {'breed': {"$regex": "Bloodhound"}},
+                             {'breed': {"$regex": "Rottweiler"}},
+                         ]
+                         },
+                         {
+                             '$and': [{'age_upon_outcome_in_weeks': {'$gte': 20, '$lte': 300}}]
+                         }]
+                }))
+    if filter_type == '4':
+        df = pd.DataFrame.from_records(db.Read({}))
+
     columns = [{"name": i, "id": i, "deletable": False, "selectable": True} for i in df.columns]
     data = df.to_dict('records')
     #
     #
-    return (data, columns)
+    return data, columns
 
 
 # Display the breeds of animal based on quantity represented in
@@ -122,12 +168,14 @@ def update_dashboard(filter_type):
     Output('graph-id', "children"),
     [Input('datatable-id', "derived_virtual_data")])
 def update_graphs(viewData):
-    ###FIX ME ####
-    # add code for chart of your choice (e.g. pie chart) #
+
+    dfg = pd.DataFrame.from_dict(viewData)
+    names= dfg['breed'].value_counts().keys().tolist()
+    values = dfg['breed'].value_counts().tolist()
 
     return [
         dcc.Graph(
-            figure=px.pie(df, names='breed', title='Preferred Animals')
+            figure=px.pie(dfg, values= values, names=names, title='Preferred Animals')
         )
     ]
 
@@ -166,24 +214,23 @@ def update_map(viewData, derived_virtual_selected_rows):
         # Austin TX is at [30.75,-97.48]
         return [
             dl.Map(style={'width': '1000px', 'height': '500px'},
-                   center=[30.75, -97.48], zoom=10, children=[
+                   center=[30.75, -97.48], zoom=9, children=[
                     dl.TileLayer(id="base-layer-id"),
                     # Marker with tool tip and popup
                     # Column 13 and 14 define the grid-coordinates for
                     # the map
                     # Column 4 defines the breed for the animal
                     # Column 9 defines the name of the animal
-                    dl.Marker(position=[dff.iloc[row, 11], dff.iloc[row, 12]],
+                    dl.Marker(position=[dff.iloc[row, 13], dff.iloc[row, 14]],
                               children=[
                                   dl.Tooltip(dff.iloc[row, 4]),
                                   dl.Popup([
                                       html.H1("Animal Name"),
-                                      html.P(dff.iloc[row, 8])
+                                      html.P(dff.iloc[row, 9])
                                   ])
                               ])
                 ])
         ]
-
 
 
 app.run_server(debug=True)
